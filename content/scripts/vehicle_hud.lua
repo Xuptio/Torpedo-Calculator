@@ -2874,11 +2874,11 @@ function render_artificial_horizion(screen_w, screen_h, pos, size, vehicle, col)
                     atlas_icons.hud_horizon_high, col, roll)
             --update_ui_text(horizon:x()-angle_width/2, horizon:y()-5, math.floor(i*angle_step_deg), 20, 1, col, 0)
             local hoz_width = 38
-			update_ui_text_mini(
+			update_ui_text(
                     offset_x + horizon:x()-angle_width/2-math.floor(hoz_width*math.cos(roll)),
                     offset_y + horizon:y()-5-math.floor(hoz_width*math.sin(roll)),
                     math.floor(i*angle_step_deg), 20, 1, col, 0)
-			update_ui_text_mini(
+			update_ui_text(
                     offset_x + horizon:x()-angle_width/2+math.floor(hoz_width*math.cos(roll))+1,
                     offset_y + horizon:y()-5+math.floor(hoz_width*math.sin(roll)),
                     math.floor(i*angle_step_deg), 20, 1, col, 0)
@@ -2892,11 +2892,11 @@ function render_artificial_horizion(screen_w, screen_h, pos, size, vehicle, col)
                 atlas_icons.hud_horizon_low, col, roll)
         --update_ui_text(horizon:x()-angle_width/2, horizon:y()-3, math.floor(-i*angle_step_deg), 20, 1, col, 0)
         local hoz_width = 41
-		update_ui_text_mini(
+		update_ui_text(
                 offset_x + horizon:x()-angle_width/2-math.floor(hoz_width*math.cos(roll)),
                 offset_y + horizon:y()-3-math.floor(hoz_width*math.sin(roll)),
                 math.floor(-i*angle_step_deg), 20, 1, col, 0)
-		update_ui_text_mini(
+		update_ui_text(
                 offset_x + horizon:x()-angle_width/2+math.floor(hoz_width*math.cos(roll))+1,
                 offset_y + horizon:y()-3+math.floor(hoz_width*math.sin(roll)),
                 math.floor(-i*angle_step_deg), 20, 1, col, 0)
