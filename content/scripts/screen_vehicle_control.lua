@@ -1400,6 +1400,9 @@ function _update(screen_w, screen_h, ticks)
                     local island_team = island:get_team_control()
                     local island_capture_progress = island:get_team_capture_progress()
                     local team_color = get_island_team_color(island_capture)
+                    if not visible then
+                        team_color = g_island_color_unknown
+                    end
 
                     if update_get_is_focus_local() then
                         local island_name = island:get_name()
