@@ -165,6 +165,24 @@ function update(screen_w, screen_h, ticks)
             sanitise_loadout(this_vehicle, 13)
             sanitise_loadout(this_vehicle, 14)
             sanitise_loadout(this_vehicle, 15)
+            -- find docked carrier
+            if get_vehicle_docked(this_vehicle) then
+                local drydock = find_team_drydock(this_vehicle:get_team())
+                if drydock ~= nil then
+                    -- attach the VLS
+                    local slots = this_vehicle:get_attachment_count()
+                    if slots >= 18 then
+                        -- has laser VLS
+                        local a14 = this_vehicle:get_attachment(14)
+                        if a14:get_definition_index() == -1 then
+                            drydock:set_attached_vehicle_attachment(0, 14, e_game_object_type.attachment_hardpoint_missile_laser)
+                            drydock:set_attached_vehicle_attachment(0, 15, e_game_object_type.attachment_hardpoint_missile_laser)
+                            drydock:set_attached_vehicle_attachment(0, 16, e_game_object_type.attachment_hardpoint_missile_laser)
+                            drydock:set_attached_vehicle_attachment(0, 17, e_game_object_type.attachment_hardpoint_missile_laser)
+                        end
+                    end
+                end
+            end
         end
     end
 

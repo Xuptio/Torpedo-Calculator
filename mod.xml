@@ -3,6 +3,9 @@
 The Revolution mod brings Radar enhancements, a more immersive fog-of-war for island captures and
 other enhancements.
 
+v1.3.12 changes:
+* when used with Tactical Operations Centre the carrier is equipped with a 4x laser missile VLS
+
 v1.3.11 changes:
 * fixed a bug where at some zoom levels island captures would show colours despite for of war
 

@@ -36,7 +36,20 @@ function update(screen_w, screen_h, ticks)
             local section_w = (screen_w - 2 * border_out - border_in) / 2
             local section_h = screen_h - 2 * border_out
 
-            render_attachment_info(border_out, border_out, section_w, section_h, attachments[1], vehicle, team, update_get_loc(e_loc.upp_icbm), e_inventory_item.ammo_cruise_missile)
+            local left_attachment = attachments[1]
+            local left_text = update_get_loc(e_loc.upp_icbm)
+            local left_inventory = e_inventory_item.ammo_cruise_missile
+            local tick = update_get_logic_tick()
+            if (tick % 120) > 60 then
+                if vehicle:get_attachment_count() >= 18 then
+                    if vehicle:get_attachment(14):get_definition_index() == e_game_object_type.attachment_hardpoint_missile_laser then
+                        left_attachment = vehicle:get_attachment(14)
+                        left_text = "LGM"
+                        left_inventory = e_inventory_item.hardpoint_missile_laser
+                    end
+                end
+            end
+            render_attachment_info(border_out, border_out, section_w, section_h, left_attachment, vehicle, team, left_text, left_inventory)
             render_attachment_info(border_out + section_w + border_in, border_out, section_w, section_h, attachments[2], vehicle, team, update_get_loc(e_loc.upp_gun), e_inventory_item.ammo_160mm_artillery)
         end
     end
@@ -83,6 +96,22 @@ function render_attachment_info(x, y, w, h, attachment, vehicle, team, name, ite
         local ammo_remaining = attachment:get_ammo_remaining()
         local target_accuracy = attachment:get_target_accuracy() / 255 * 100
         local control_mode = attachment:get_control_mode()
+        if item_index == e_inventory_item.hardpoint_missile_laser then
+            control_mode = "on"
+            ammo_remaining = 0
+            ammo_capacity = -1
+            -- total up all attachments with lasers
+            for ai = 0, vehicle:get_attachment_count() - 1 do
+                local at = vehicle:get_attachment(ai)
+                if at then
+                    local ad = at:get_definition_index()
+                    if ad == e_game_object_type.attachment_hardpoint_missile_laser then
+                        ammo_capacity = ammo_capacity + 1
+                        ammo_remaining = ammo_remaining + at:get_ammo_remaining()
+                    end
+                end
+            end
+        end
 
         local target_id = team:get_consuming_attachment_target(vehicle:get_id(), attachment:get_index())
         local target_vehicle_id = 0
@@ -111,7 +140,7 @@ function render_attachment_info(x, y, w, h, attachment, vehicle, team, name, ite
 
         update_ui_image(cx, cy, icon, col, 0)
         update_ui_rectangle(cx + 18, 0, 1, 19, col)
-        update_ui_text(cx + 21, cy + 4, name, 200, 0, col, 0)
+        update_ui_text(cx + 21, cy + 4, name, w, 0, col, 0)
         cy = cy + 17
 
         update_ui_rectangle(0, cy, w, 1, col)
@@ -231,8 +260,8 @@ function render_attachment_info(x, y, w, h, attachment, vehicle, team, name, ite
         local y = h - 37
 
         update_ui_rectangle(0, y - 1, w, 1, col)
-        if definition_index == e_game_object_type.attachment_turret_carrier_missile_silo then
-            for i = 0, 5 do
+        if definition_index == e_game_object_type.attachment_turret_carrier_missile_silo or definition_index == e_game_object_type.attachment_hardpoint_missile_laser then
+            for i = 0, ammo_capacity do
                 render_missile(1 + i * 9, y, ammo_remaining > i, ammo_remaining == i + 1 and target_id ~= 0)
             end
         else
