@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<data name="Revolution 1.3.12" author="Thumblegudget, Bredroll, QuantX, NexusQuille, Xuptio" description="
+<data name="Revolution 1.3.13" author="Thumblegudget, Bredroll, QuantX, NexusQuille, Xuptio" description="
 The Revolution mod brings Radar enhancements, a more immersive fog-of-war for island captures and
 other enhancements.
+
+v1.3.13 changes:
+* fix the mystery-island extension mod so that island types are now hidden when in the fog of war
 
 v1.3.12 changes:
 * when used with Tactical Operations Centre the carrier is equipped with a 4x laser missile VLS

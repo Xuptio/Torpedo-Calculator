@@ -2609,17 +2609,23 @@ function _update(screen_w, screen_h, ticks)
                 local text = update_get_loc(e_loc.upp_command_center)
                 local text_w = update_ui_get_text_size(text, 200, 0)
                 local highlighted_island_team_color = update_get_team_color(highlighted_island:get_team_control())
-                if not fow_island_visible(highlighted_island:get_id()) then
+                local island_visible = fow_island_visible(highlighted_island:get_id())
+                if not island_visible then
                     highlighted_island_team_color = g_island_color_unknown
                 end
+                local text_x = 14
 
                 render_tooltip(10, 10, screen_w - 20, screen_h - 20, g_cursor_pos_x, g_cursor_pos_y, text_w + 18, 17, 10, function(w, h)
-                    local category_data = g_item_categories[highlighted_island:get_facility_category()]
-                    update_ui_image(4, 4, category_data.icon, highlighted_island_team_color, 0)
-                    if highlighted_island:get_team_control() == update_get_screen_team_id() then
-                        update_ui_text(14, 4, text, w, 0, color_white, 0)
+                    if island_visible or not g_revolution_hide_hostile_island_types then
+                        local category_data = g_item_categories[highlighted_island:get_facility_category()]
+                        update_ui_image(4, 4, category_data.icon, highlighted_island_team_color, 0)
                     else
-                        update_ui_text(14, 4, text, w, 0, color_grey_dark, 0)
+                        text_x = 8
+                    end
+                    if highlighted_island:get_team_control() == update_get_screen_team_id() then
+                        update_ui_text(text_x, 4, text, w, 0, color_white, 0)
+                    else
+                        update_ui_text(text_x, 4, text, w, 0, color_grey_dark, 0)
                     end
                 end)
             end
