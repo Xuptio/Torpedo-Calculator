@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<data name="Revolution 1.3.13" author="Thumblegudget, Bredroll, QuantX, NexusQuille, Xuptio" description="
+<data name="Revolution 1.3.14" author="Thumblegudget, Bredroll, QuantX, NexusQuille, Xuptio" description="
 The Revolution mod brings Radar enhancements, a more immersive fog-of-war for island captures and
 other enhancements.
+
+v1.3.14 changes:
+* fix a problem where rapid clicks of the barge button would exceed the barge cap
 
 v1.3.13 changes:
 * fix the mystery-island extension mod so that island types are now hidden when in the fog of war
