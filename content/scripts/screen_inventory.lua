@@ -1574,6 +1574,7 @@ function render_map_facility_ui(screen_w, screen_h, x, y, w, h, category_data, f
                     if order_barges and g_barge_count >= g_barge_max then
                         g_tab_map.selected_facility_item = -1
                     else
+                        g_barge_count = g_barge_count + 1
                         facility_tile:set_facility_add_production_queue_item(item.index, 1)
                     end
                 elseif result == 1 then
