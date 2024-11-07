@@ -318,14 +318,58 @@ function real_update(screen_w, screen_h, tick_fraction, delta_time, local_peer_i
                 if def == e_game_object_type.chassis_land_turret then
                     render_turret_hud(screen_w, screen_h, vehicle)
                 end
+
+		render_attachment_hotbar(screen_w, screen_h, vehicle)
+            	render_notification(screen_w, screen_h)
+
+
+		----------------------------------------------------------------
+                --- Code to have an extra camera minimap in bottom right corner
+                ----------------------------------------------------------------
+
+                -- smallx and smally are the small offset from the extreme corners of the screen
+                local smallx = 3 
+                local smally = 2  
+                -- divfactor is the overall scale of the minimap 
+                -- this can be changed and the other factors should scale with it 
+                -- 4 is too large, 6 is too small
+                local divfactor = 5
+                local twicedivfactor = divfactor*2
+                -- xoff_toscreen and y are the offset required from the center of screen
+                local xoff_toscreen = (screen_w/twicedivfactor)
+                local yoff_toscreen = (screen_h/twicedivfactor)
+                -- map x y defines the top left position of the minimap 
+                local map_x = screen_w - smallx - 1.0*(screen_w/divfactor) -- minimap start x       
+                local map_y = screen_h - smally - 1.0*(screen_h/divfactor) -- minimap start y 
+                -- map w h defines the width and heigh of the minimap
+                local map_w = screen_w/divfactor  - smallx
+                local map_h = screen_h/divfactor  - smally
+                
+                -- crops the minimap 
+                update_set_screen_background_clip(map_x, screen_h - map_y - map_h, map_w, map_h)
+                -- sets the type of map - wind, current, topology etc... 
+                update_set_screen_background_type(8)
+                update_set_screen_background_tile_color_custom(color8(128, 64, 128, 175))
+                update_set_screen_background_color(color8(0, 80, 0, 100))
+
+                update_ui_push_clip(map_x, map_y, map_w, map_h)
+                -- this is a new function for the minimap drawn from the render_map_details
+                -- takes in the same arguements except for two extra that define the offsets
+                -- required for the minimap 
+                render_map_details_minimap(
+                    map_x, map_y, map_w, map_h, screen_w, screen_h, vehicle, attachment, 
+                    screen_w/2 - xoff_toscreen, screen_h/2 - yoff_toscreen
+                )
+                update_ui_pop_clip()
+                -- draw green box around the minimap 
+                update_ui_rectangle_outline(map_x, map_y, map_w, map_h, color8(0, 255, 0, 255))
+
+                --------
+                -- had to update the fuel estimates, time and efficienty offsets 
+                --------
+		
             end
 
-            render_attachment_hotbar(screen_w, screen_h, vehicle)
-            render_notification(screen_w, screen_h)
-
-            -- render_vehicle_info(vec2(screen_w - 100, screen_h - 65), vehicle)
-
-            update_set_screen_background_type(0)
 
             if g_is_map_overlay or is_render_awacs then
                 local map_x = 12
@@ -939,6 +983,346 @@ function render_map_details(x, y, w, h, screen_w, screen_h, screen_vehicle, atta
     update_ui_pop_offset()
 end
 
+
+----
+-- new function to render the minimap when in vehicle control 
+----
+function render_map_details_minimap(x, y, w, h, screen_w, screen_h, screen_vehicle, attachment, offset_x, offset_y)
+    local camera_x = screen_vehicle:get_position():x()
+    local camera_y = screen_vehicle:get_position():z()
+    
+    local is_viewing_sub_camera = false
+    
+    if attachment:get() then
+        attachment:get_is_viewing_sub_camera()
+    end
+
+    if is_viewing_sub_camera then
+        camera_x = update_get_camera_position():x()
+        camera_y = update_get_camera_position():z()
+    end
+
+    
+        
+    
+    -- this ultimately set the 'zoom' of the minimap    
+    local camera_size = 10000 
+    -- had to do a lot of trial and error to find the right multiple factors 
+    local world_offx = (offset_x*10*3.9) 
+    local world_offy = (offset_y*10*3.9)
+    
+    -- this moves the minimap camera offset from the center of the screen 
+    update_set_screen_map_position_scale(camera_x - world_offx , camera_y + world_offy, camera_size)
+
+    local function world_to_screen(x, y)
+        return get_screen_from_world(x, y, camera_x, camera_y, camera_size, screen_w, screen_h)
+    end
+    
+    
+
+    local is_render_islands = (camera_size < (64 * 1024))
+
+    update_set_screen_background_is_render_islands(true)
+
+    -- render tiles
+
+    if is_render_islands then
+        --- this is to render the island name text offset 
+        for _, tile in iter_tiles() do
+            local tile_color = tile:get_team_color()
+            
+            local position_xz = tile:get_position_xz()
+            local island_name = tile:get_name()
+            local label_x, label_y = world_to_screen(position_xz:x()  , position_xz:y() )
+            update_ui_text(label_x + 64, label_y + 32, island_name, 128, 1, tile_color, 0)
+        end
+    else
+        --- if zoom is large to not show island names 
+        for _, tile in iter_tiles() do
+            local tile_color = tile:get_team_color()
+            local position_xz = tile:get_position_xz()
+            local screen_x, screen_y = world_to_screen(position_xz:x() , position_xz:y() )
+            update_ui_image(screen_x - 4 , screen_y - 4 , atlas_icons.map_icon_island, tile_color, 0)
+        end
+    end
+
+    local team_color = color_friendly
+    local screen_x, screen_y = world_to_screen(camera_x, camera_y)
+
+    --- this section is for the triangle representation of the player in the minimap 
+    local heading = update_get_camera_heading()
+    
+    local fov = update_get_camera_fov()
+    -- this is inverted and custom version of the field of vision 
+    local cone_length = 10
+    local fovfactor = 3.75
+    local p1 = vec2(math.sin(heading - fov / fovfactor) * cone_length, -math.cos(heading - fov / fovfactor) * cone_length)
+    local p2 = vec2(math.sin(heading + fov / fovfactor) * cone_length, -math.cos(heading + fov / fovfactor) * cone_length)
+    
+    -- draw a triangle between the two p1 p2 vectors 
+    update_ui_begin_triangles()
+    update_ui_add_triangle(
+        vec2(screen_x + offset_x, screen_y + offset_y), 
+        vec2(screen_x + offset_x - p2:x(), screen_y + offset_y - p2:y()), 
+        vec2(screen_x + offset_x - p1:x(), screen_y + offset_y - p1:y()), 
+        color8(255, 255, 255, 255)
+                        )
+    update_ui_end_triangles()
+
+    --- this section is for the lines on top of the cone of vision 
+    --local p3 = vec2(math.sin(heading) * 32, -math.cos(heading) * 32)
+    --update_ui_line(screen_x, screen_y, screen_x + p1:x(), screen_y + p1:y(), color8(255, 255, 255, 64))
+    --update_ui_line(screen_x, screen_y, screen_x + p2:x(), screen_y + p2:y(), color8(255, 255, 255, 64))
+    --update_ui_line(screen_x, screen_y, screen_x + p3:x(), screen_y + p3:y(), color8(255, 255, 255, 64))
+
+    if is_viewing_sub_camera then
+        update_ui_image_rot(screen_x, screen_y, atlas_icons.map_icon_camera, color_friendly, 0)
+    end
+    
+    --- this section is for the line pointing in the player movement direction 
+    --local vehicle_dir = screen_vehicle:get_forward()
+    --local vehicle_dir_xz = vec2_normal(vec2(vehicle_dir:x(), vehicle_dir:z()))
+    --local screen_x, screen_y = world_to_screen(screen_vehicle:get_position():x(), screen_vehicle:get_position():z())
+    --update_ui_line(screen_x + offset_x , screen_y+ offset_y , screen_x + offset_x  + vehicle_dir_xz:x() * 12, screen_y + offset_y - vehicle_dir_xz:y() * 12, team_color)
+    
+    -- render vehicles
+
+    local function filter_vehicles(v)
+        local def = v:get_definition_index()
+        return v:get_is_docked() == false and def ~= e_game_object_type.drydock and def ~= e_game_object_type.chassis_spaceship and v:get_is_observation_revealed()
+    end
+
+    for _, vehicle in iter_vehicles(filter_vehicles) do
+        local icon_region, icon_offset = get_icon_data_by_definition_index(vehicle:get_definition_index())
+        local position_xz = vehicle:get_position()
+        local screen_x, screen_y = world_to_screen(position_xz:x(), position_xz:z())
+        local vehicle_team = vehicle:get_team_id()
+
+        --- find if this vehicle id is the one the player is piloting 
+        --- probably a more elegent way to obtain this
+        local controlling_vehicle_id
+        if  screen_x <= math.floor(screen_w/2) +1 and screen_x >= math.floor(screen_w/2) -1 and screen_y <= math.floor(screen_h/2) +1 and screen_y >= math.floor(screen_h/2) -1 then 
+            controlling_vehicle_id = vehicle:get_id()
+        end
+
+        local element_color = color8(16, 16, 16, 255)
+
+        if vehicle_team == update_get_screen_team_id() then
+            element_color = color_friendly
+        else
+            element_color = color_enemy 
+        end
+
+
+        -- this is for visiable vehicles on an island
+        -- add text labels to the vehicles 
+        -- TODO buildings don't work 
+        if vehicle:get_is_visible() and vehicle:get_id() ~= controlling_vehicle_id then
+             
+
+            local white = color8(255, 255, 255, 255)
+            --- have different text depending on vehicle 
+            if vehicle:get_definition_index() == 0 then 
+                --- carrier 
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "CRR",
+                64, 0, element_color, 0
+                                )
+            elseif vehicle:get_definition_index() == 2 then 
+                --- sel 
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "SEL",
+                64, 0, element_color, 0
+                                )
+            elseif vehicle:get_definition_index() == 4 then 
+                --- walrus 
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "WLR",
+                64, 0, element_color, 0
+                                )
+            elseif vehicle:get_definition_index() == 6 then 
+                --- bear 
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "BER",
+                64, 0, element_color, 0
+                                )
+            elseif vehicle:get_definition_index() == 8 then 
+                --- albatross 
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "ALB",
+                64, 0, element_color, 0
+                                )
+            elseif vehicle:get_definition_index() == 10 then 
+                --- manta 
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "MTA",
+                64, 0, element_color, 0
+                                )
+            elseif vehicle:get_definition_index() == 12 then 
+                --- air light 
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "RZB",
+                64, 0, element_color, 0
+                                )
+            elseif vehicle:get_definition_index() == 14 then 
+                --- PeTRel
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "PTR",
+                64, 0, element_color, 0
+                                )
+            elseif vehicle:get_definition_index() == 16 then 
+                --- barge 
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "BRG",
+                64, 0, element_color, 0
+                                )
+            elseif vehicle:get_definition_index() == 44 then 
+                --- missile_1 
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "*",
+                64, 0, white, 0
+                                )
+            elseif vehicle:get_definition_index() == 45 then 
+                --- missile_2 
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "*",
+                64, 0, white, 0
+                                )
+            elseif vehicle:get_definition_index() == 46 then 
+                --- missile_3 
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "*",
+                64, 0, white, 0
+                                )
+            elseif vehicle:get_definition_index() == 47 then 
+                --- missile_4 
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "*",
+                64, 0, white, 0
+                                )
+            elseif vehicle:get_definition_index() == 48 then 
+                --- missile_5 
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "*",
+                64, 0, white, 0
+                                )
+            
+            elseif vehicle:get_definition_index() == 49 then 
+                --- cruise missile  
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "*",
+                64, 0, white, 0
+                                )
+            
+            elseif vehicle:get_definition_index() == 52 then 
+                --- bomb 1  
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "*",
+                64, 0, white, 0
+                                )
+                                
+            elseif vehicle:get_definition_index() == 53 then 
+                --- bomb 2   
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "*",
+                64, 0, white, 0
+                                )
+            elseif vehicle:get_definition_index() == 54 then 
+                --- bomb 3   
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "*",
+                64, 0, white, 0
+                                )
+            elseif vehicle:get_definition_index() == 58 then 
+                --- robot dog 
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "DOG",
+                64, 0, element_color, 0
+                                )
+            elseif vehicle:get_definition_index() == 62 then 
+                --- airfield 
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "AIR",
+                64, 0, element_color, 0
+                                )
+            
+            elseif vehicle:get_definition_index() == 71 then 
+                --- tv missile  
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "tv",
+                64, 0, element_color, 0
+                                )
+            elseif vehicle:get_definition_index() == 77 then 
+                --- needlefish 
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "NDL",
+                64, 0, element_color, 0
+                                )
+            elseif vehicle:get_definition_index() == 79 then 
+                --- swordfish 
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "SRD",
+                64, 0, element_color, 0
+                                )
+            elseif vehicle:get_definition_index() == 88 then 
+                --- mule  
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "MLE",
+                64, 0, element_color, 0
+                                )
+            -- experimenting with labels for buildings, doesn't appear to work
+            elseif vehicle:get_definition_index() == 87 then 
+                --- mule  
+                update_ui_text_mini(screen_x - icon_offset + offset_x, screen_y - icon_offset + offset_y,
+                "TRT",
+                64, 0, element_color, 0
+                                )
+            
+            
+
+            end
+            
+            -- original draw symbols of circles or triangles on the map, kinda boring 
+            --update_ui_image(screen_x - icon_offset + offset_x , screen_y - icon_offset + offset_y , icon_region, element_color, 0)
+            --update_ui_image(screen_x - icon_offset , screen_y - icon_offset  , icon_region, element_color, 0)
+        else
+            local last_known_position_xz, is_last_known_position_set = vehicle:get_vision_last_known_position_xz()
+
+            if is_last_known_position_set then
+                local screen_x, screen_y = world_to_screen(last_known_position_xz:x(), last_known_position_xz:y())
+                update_ui_image(screen_x - 2 + offset_x , screen_y - 2 + offset_y , atlas_icons.map_icon_last_known_pos, element_color, 0)
+                --update_ui_image(screen_x - 2  , screen_y - 2  , atlas_icons.map_icon_last_known_pos, element_color, 0)
+            
+            end
+        end
+    end
+
+
+    if attachment:get() then
+        local def = attachment:get_definition_index()
+
+        if def == e_game_object_type.attachment_camera
+        or def == e_game_object_type.attachment_camera_plane
+        or def == e_game_object_type.attachment_camera_observation
+        or def == e_game_object_type.attachment_turret_carrier_camera
+        then
+            if attachment:get_stabilisation_mode() == "tracking" then
+                local hit_pos = attachment:get_hitscan_position()
+                local screen_x, screen_y = world_to_screen(hit_pos:x(), hit_pos:z())
+                
+                update_ui_image(screen_x - 4, screen_y - 4, atlas_icons.column_laser, color8(0, 255, 0, 255), 0)
+            end
+        end
+    end
+
+    update_ui_push_offset(x, y)
+    
+    
+    
+
+
+    update_ui_pop_offset()
+end
 
 --------------------------------------------------------------------------------
 --
@@ -4528,7 +4912,7 @@ Variometer = {
 
         -- total %
         update_ui_text_mini(
-                pos:x() - 37,
+                pos:x() - 43,
                 pos:y() + 158,
                 string.format("%2.1f %s", fuel_count * 100, "%"),
                 64, 0, fuel_number_col, 0)
@@ -4543,13 +4927,13 @@ Variometer = {
         end
         -- % / min
         update_ui_text_mini(
-                pos:x() - 32,
+                pos:x() - 43,
                 pos:y() + 164,
                 fuel_use_per_min,
                 64, 0, col, 0)
         -- time
         update_ui_text_mini(
-                pos:x() - 32,
+                pos:x() - 43,
                 pos:y() + 170,
                 fuel_time_mins,
                 200, 0, fuel_number_col, 0)
